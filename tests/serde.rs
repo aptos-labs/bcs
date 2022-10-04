@@ -667,3 +667,18 @@ fn test_recursion_limit() {
         Err(not_supported_err)
     );
 }
+
+#[derive(Deserialize, Serialize)]
+enum EnumA {
+    ValueA,
+}
+
+#[test]
+fn test_recursion_limit_enum() {
+    let a = EnumA::ValueA;
+
+    to_bytes_with_limit(&a, 0).unwrap_err();
+
+    let bytes = to_bytes_with_limit(&a, 1).unwrap();
+    let _: EnumA = from_bytes_with_limit(&bytes, 1).unwrap();
+}
