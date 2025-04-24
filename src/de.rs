@@ -167,7 +167,7 @@ impl<'de> Deserializer<'de> {
         Ok(u128::from_le_bytes(le_bytes))
     }
 
-    #[allow(clippy::integer_arithmetic)]
+    #[allow(clippy::arithmetic_side_effects)]
     fn parse_u32_from_uleb128(&mut self) -> Result<u32> {
         let mut value: u64 = 0;
         for shift in (0..32).step_by(7) {
@@ -223,7 +223,7 @@ impl<'de> Deserializer<'de> {
     }
 }
 
-impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
+impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
     type Error = Error;
 
     // BCS is not a self-describing format so we can't implement `deserialize_any`
@@ -400,23 +400,23 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         r
     }
 
-    fn deserialize_seq<V>(mut self, visitor: V) -> Result<V::Value>
+    fn deserialize_seq<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
         let len = self.parse_length()?;
-        visitor.visit_seq(SeqDeserializer::new(&mut self, len))
+        visitor.visit_seq(SeqDeserializer::new(self, len))
     }
 
-    fn deserialize_tuple<V>(mut self, len: usize, visitor: V) -> Result<V::Value>
+    fn deserialize_tuple<V>(self, len: usize, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
-        visitor.visit_seq(SeqDeserializer::new(&mut self, len))
+        visitor.visit_seq(SeqDeserializer::new(self, len))
     }
 
     fn deserialize_tuple_struct<V>(
-        mut self,
+        self,
         name: &'static str,
         len: usize,
         visitor: V,
@@ -425,21 +425,21 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         V: Visitor<'de>,
     {
         self.enter_named_container(name)?;
-        let r = visitor.visit_seq(SeqDeserializer::new(&mut self, len));
+        let r = visitor.visit_seq(SeqDeserializer::new(self, len));
         self.leave_named_container();
         r
     }
 
-    fn deserialize_map<V>(mut self, visitor: V) -> Result<V::Value>
+    fn deserialize_map<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
         let len = self.parse_length()?;
-        visitor.visit_map(MapDeserializer::new(&mut self, len))
+        visitor.visit_map(MapDeserializer::new(self, len))
     }
 
     fn deserialize_struct<V>(
-        mut self,
+        self,
         name: &'static str,
         fields: &'static [&'static str],
         visitor: V,
@@ -448,7 +448,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         V: Visitor<'de>,
     {
         self.enter_named_container(name)?;
-        let r = visitor.visit_seq(SeqDeserializer::new(&mut self, fields.len()));
+        let r = visitor.visit_seq(SeqDeserializer::new(self, fields.len()));
         self.leave_named_container();
         r
     }
@@ -501,7 +501,7 @@ impl<'a, 'de> SeqDeserializer<'a, 'de> {
     }
 }
 
-impl<'de, 'a> de::SeqAccess<'de> for SeqDeserializer<'a, 'de> {
+impl<'de> de::SeqAccess<'de> for SeqDeserializer<'_, 'de> {
     type Error = Error;
 
     fn next_element_seed<T>(&mut self, seed: T) -> Result<Option<T::Value>>
@@ -537,7 +537,7 @@ impl<'a, 'de> MapDeserializer<'a, 'de> {
     }
 }
 
-impl<'de, 'a> de::MapAccess<'de> for MapDeserializer<'a, 'de> {
+impl<'de> de::MapAccess<'de> for MapDeserializer<'_, 'de> {
     type Error = Error;
 
     fn next_key_seed<K>(&mut self, seed: K) -> Result<Option<K::Value>>
@@ -577,7 +577,7 @@ impl<'de, 'a> de::MapAccess<'de> for MapDeserializer<'a, 'de> {
     }
 }
 
-impl<'de, 'a> de::EnumAccess<'de> for &'a mut Deserializer<'de> {
+impl<'de> de::EnumAccess<'de> for &mut Deserializer<'de> {
     type Error = Error;
     type Variant = Self;
 
@@ -591,7 +591,7 @@ impl<'de, 'a> de::EnumAccess<'de> for &'a mut Deserializer<'de> {
     }
 }
 
-impl<'de, 'a> de::VariantAccess<'de> for &'a mut Deserializer<'de> {
+impl<'de> de::VariantAccess<'de> for &mut Deserializer<'de> {
     type Error = Error;
 
     fn unit_variant(self) -> Result<()> {

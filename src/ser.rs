@@ -406,7 +406,7 @@ where
     }
 }
 
-impl<'a, W> ser::SerializeSeq for Serializer<'a, W>
+impl<W> ser::SerializeSeq for Serializer<'_, W>
 where
     W: ?Sized + std::io::Write,
 {
@@ -425,7 +425,7 @@ where
     }
 }
 
-impl<'a, W> ser::SerializeTuple for Serializer<'a, W>
+impl<W> ser::SerializeTuple for Serializer<'_, W>
 where
     W: ?Sized + std::io::Write,
 {
@@ -444,7 +444,7 @@ where
     }
 }
 
-impl<'a, W> ser::SerializeTupleStruct for Serializer<'a, W>
+impl<W> ser::SerializeTupleStruct for Serializer<'_, W>
 where
     W: ?Sized + std::io::Write,
 {
@@ -463,7 +463,7 @@ where
     }
 }
 
-impl<'a, W> ser::SerializeTupleVariant for Serializer<'a, W>
+impl<W> ser::SerializeTupleVariant for Serializer<'_, W>
 where
     W: ?Sized + std::io::Write,
 {
@@ -499,7 +499,7 @@ impl<'a, W: ?Sized> MapSerializer<'a, W> {
     }
 }
 
-impl<'a, W> ser::SerializeMap for MapSerializer<'a, W>
+impl<W> ser::SerializeMap for MapSerializer<'_, W>
 where
     W: ?Sized + std::io::Write,
 {
@@ -560,7 +560,7 @@ where
     }
 }
 
-impl<'a, W> ser::SerializeStruct for Serializer<'a, W>
+impl<W> ser::SerializeStruct for Serializer<'_, W>
 where
     W: ?Sized + std::io::Write,
 {
@@ -579,7 +579,7 @@ where
     }
 }
 
-impl<'a, W> ser::SerializeStructVariant for Serializer<'a, W>
+impl<W> ser::SerializeStructVariant for Serializer<'_, W>
 where
     W: ?Sized + std::io::Write,
 {
