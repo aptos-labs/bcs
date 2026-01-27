@@ -4,6 +4,12 @@
 // For some reason deriving `Arbitrary` results in clippy firing a `unit_arg` violation
 #![allow(clippy::unit_arg)]
 #![allow(non_local_definitions)]
+// Allow these clippy warnings for test code
+#![allow(clippy::needless_pass_by_value)]
+#![allow(clippy::zero_sized_map_values)]
+#![allow(clippy::items_after_statements)]
+#![allow(clippy::match_wildcard_for_single_variants)]
+#![allow(clippy::owned_cow)]
 
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -163,7 +169,7 @@ proptest! {
 
     #[test]
     fn proptest_option(v in any::<Option<u8>>()) {
-        let expected = v.map(|v| vec![1, v]).unwrap_or_else(|| vec![0]);
+        let expected = v.map_or_else(|| vec![0], |v| vec![1, v]);
         assert_eq!(to_bytes(&v)?, expected);
 
         is_same(v);
@@ -682,4 +688,274 @@ fn test_recursion_limit_enum() {
 
     let bytes = to_bytes_with_limit(&a, 1).unwrap();
     let _: EnumA = from_bytes_with_limit(&bytes, 1).unwrap();
+}
+
+// ============================================================================
+// Additional tests for 100% coverage
+// ============================================================================
+
+#[test]
+fn test_to_bytes_with_capacity() {
+    use bcs::to_bytes_with_capacity;
+
+    let data = vec![1u32, 2, 3, 4, 5];
+    let bytes = to_bytes_with_capacity(&data, 100).unwrap();
+    let expected = to_bytes(&data).unwrap();
+    assert_eq!(bytes, expected);
+}
+
+#[test]
+fn test_serialized_size_with_limit() {
+    use bcs::{serialized_size, serialized_size_with_limit};
+
+    let data = vec![1u32, 2, 3];
+    let size = serialized_size_with_limit(&data, 10).unwrap();
+    assert_eq!(size, serialized_size(&data).unwrap());
+
+    // Test exceeding limit
+    let err = serialized_size_with_limit(&data, 501).unwrap_err();
+    assert!(matches!(err, Error::NotSupported(_)));
+}
+
+#[test]
+fn test_serialize_into_with_limit_exceeding() {
+    use bcs::serialize_into_with_limit;
+
+    let data = 42u32;
+    let mut output = Vec::new();
+    let err = serialize_into_with_limit(&mut output, &data, 501).unwrap_err();
+    assert!(matches!(err, Error::NotSupported(_)));
+}
+
+#[test]
+fn test_is_human_readable() {
+    assert!(!bcs::is_human_readable());
+}
+
+#[test]
+fn test_from_bytes_seed() {
+    use bcs::from_bytes_seed;
+    use serde::de::DeserializeSeed;
+
+    struct U32Seed;
+
+    impl<'de> DeserializeSeed<'de> for U32Seed {
+        type Value = u32;
+
+        fn deserialize<D>(self, deserializer: D) -> std::result::Result<Self::Value, D::Error>
+        where
+            D: serde::Deserializer<'de>,
+        {
+            u32::deserialize(deserializer)
+        }
+    }
+
+    let bytes = to_bytes(&42u32).unwrap();
+    let result: u32 = from_bytes_seed(U32Seed, &bytes).unwrap();
+    assert_eq!(result, 42);
+}
+
+#[test]
+fn test_from_bytes_seed_with_limit() {
+    use bcs::from_bytes_seed_with_limit;
+    use serde::de::DeserializeSeed;
+
+    struct U32Seed;
+
+    impl<'de> DeserializeSeed<'de> for U32Seed {
+        type Value = u32;
+
+        fn deserialize<D>(self, deserializer: D) -> std::result::Result<Self::Value, D::Error>
+        where
+            D: serde::Deserializer<'de>,
+        {
+            u32::deserialize(deserializer)
+        }
+    }
+
+    let bytes = to_bytes(&42u32).unwrap();
+    let result: u32 = from_bytes_seed_with_limit(U32Seed, &bytes, 10).unwrap();
+    assert_eq!(result, 42);
+
+    // Test exceeding limit
+    let err = from_bytes_seed_with_limit(U32Seed, &bytes, 501).unwrap_err();
+    assert!(matches!(err, Error::NotSupported(_)));
+}
+
+#[test]
+fn test_unit_struct_serde() {
+    #[derive(Serialize, Deserialize, Debug, PartialEq)]
+    struct UnitStruct;
+
+    let bytes = to_bytes(&UnitStruct).unwrap();
+    let result: UnitStruct = from_bytes(&bytes).unwrap();
+    assert_eq!(result, UnitStruct);
+}
+
+#[test]
+fn test_tuple_struct_serde() {
+    #[derive(Serialize, Deserialize, Debug, PartialEq)]
+    struct TupleStruct(u32, String);
+
+    let data = TupleStruct(42, "hello".to_string());
+    let bytes = to_bytes(&data).unwrap();
+    let result: TupleStruct = from_bytes(&bytes).unwrap();
+    assert_eq!(result, data);
+}
+
+#[test]
+fn test_eof_error_in_read_bytes() {
+    // Try to deserialize with insufficient bytes
+    let bytes = vec![0x05]; // Length says 5 bytes, but only 1 byte available
+    let err = from_bytes::<Vec<u8>>(&bytes).unwrap_err();
+    assert!(matches!(err, Error::Eof));
+}
+
+#[test]
+fn test_test_helpers() {
+    use bcs::test_helpers::assert_canonical_encode_decode;
+
+    assert_canonical_encode_decode(&42u32);
+    assert_canonical_encode_decode(&"hello".to_string());
+    assert_canonical_encode_decode(&vec![1, 2, 3]);
+}
+
+#[test]
+fn test_map_serialization_error_paths() {
+    // Test empty map
+    let map: BTreeMap<u32, u32> = BTreeMap::new();
+    let bytes = to_bytes(&map).unwrap();
+    let result: BTreeMap<u32, u32> = from_bytes(&bytes).unwrap();
+    assert_eq!(result, map);
+}
+
+#[test]
+fn test_byte_buf_deserialization() {
+    // Test deserializing into Vec<u8> (uses deserialize_byte_buf path)
+    let data: Vec<u8> = vec![1, 2, 3, 4, 5];
+    let bytes = to_bytes(&data).unwrap();
+    let result: Vec<u8> = from_bytes(&bytes).unwrap();
+    assert_eq!(result, data);
+}
+
+#[test]
+fn test_custom_error() {
+    // Test Error::Custom path via serde
+    let err: Error = <Error as serde::de::Error>::custom("test error");
+    assert!(matches!(err, Error::Custom(_)));
+}
+
+#[test]
+fn test_io_error_conversion() {
+    use std::io;
+
+    let io_err = io::Error::other("test");
+    let bcs_err: Error = io_err.into();
+    assert!(matches!(bcs_err, Error::Io(_)));
+}
+
+#[test]
+fn test_serialization_custom_error() {
+    // Test ser::Error::custom path
+    let err: Error = <Error as serde::ser::Error>::custom("serialization error");
+    assert!(matches!(err, Error::Custom(_)));
+}
+
+#[test]
+fn test_exceeded_max_sequence_length() {
+    // Create bytes that claim a huge sequence length
+    // ULEB128 encoding of MAX_SEQUENCE_LENGTH + 1 = 2^31
+    let bytes = vec![0x80, 0x80, 0x80, 0x80, 0x08]; // 2^31 in ULEB128
+    let err = from_bytes::<Vec<u8>>(&bytes).unwrap_err();
+    assert!(matches!(err, Error::ExceededMaxLen(_)));
+}
+
+// ============================================================================
+// Security tests
+// ============================================================================
+
+#[test]
+fn test_memory_amplification_protection() {
+    // Security test: Ensure that claiming a large length with insufficient data
+    // returns Eof quickly without attempting to allocate large amounts of memory.
+    //
+    // A 5-byte payload claiming 1 million elements should fail immediately,
+    // not after trying to allocate memory for 1 million elements.
+
+    // ULEB128 encoding of 1,000,000 = 0xF4240
+    // 0x40 | 0x80 = 0xC0, 0x84 | 0x80 = 0x84 (wait, let me recalculate)
+    // 1,000,000 = 0xF4240
+    // Byte 0: 0x40 | 0x80 = 0xC0 (bits 0-6 = 64)
+    // Byte 1: 0x48 | 0x80 = 0xC8 (bits 7-13 = 72) -- wait let me do this properly
+    // 1,000,000 in binary: 11110100001001000000
+    // Split into 7-bit groups from LSB: 1000000 (64), 0100100 (36), 0111101 (61)
+    // So: 0xC0 (64 + 0x80), 0xA4 (36 + 0x80), 0x3D (61, no continuation)
+    let bytes = vec![0xC0, 0x84, 0x3D]; // ULEB128 for 1,000,000
+
+    let err = from_bytes::<Vec<u8>>(&bytes).unwrap_err();
+    // Should fail with Eof because we only have 0 bytes of actual data,
+    // but claimed 1,000,000 bytes
+    assert!(matches!(err, Error::Eof));
+}
+
+#[test]
+fn test_memory_amplification_protection_string() {
+    // Test the same protection for strings
+    // Claim 10,000 bytes but provide only 2
+    let bytes = vec![0x90, 0x4E, b'h', b'i']; // ULEB128 for 10,000, then "hi"
+
+    let err = from_bytes::<String>(&bytes).unwrap_err();
+    assert!(matches!(err, Error::Eof));
+}
+
+#[test]
+fn test_memory_amplification_small_valid_length() {
+    // Make sure valid small lengths still work
+    let bytes = vec![0x02, 0x41, 0x42]; // length 2, then "AB"
+    let result: Vec<u8> = from_bytes(&bytes).unwrap();
+    assert_eq!(result, vec![0x41, 0x42]);
+}
+
+#[test]
+fn test_duplicate_map_keys_serialization() {
+    // Create a HashMap and manually serialize it to test the duplicate detection.
+    // Since HashMap doesn't allow duplicate keys directly, we need to test via
+    // serde's serialize_map interface with a custom type.
+    #[derive(Debug)]
+    struct DuplicateKeyMap;
+
+    impl Serialize for DuplicateKeyMap {
+        fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+        where
+            S: serde::Serializer,
+        {
+            use serde::ser::SerializeMap;
+            let mut map = serializer.serialize_map(Some(2))?;
+            map.serialize_entry(&1u32, &"first")?;
+            map.serialize_entry(&1u32, &"second")?; // Duplicate key!
+            map.end()
+        }
+    }
+
+    let err = to_bytes(&DuplicateKeyMap).unwrap_err();
+    assert!(matches!(err, Error::NonCanonicalMap));
+}
+
+#[test]
+fn test_map_serialization_no_duplicates() {
+    use std::collections::HashMap;
+
+    // Normal map without duplicates should work fine
+    let mut map = HashMap::new();
+    map.insert(1u32, "one");
+    map.insert(2u32, "two");
+    map.insert(3u32, "three");
+
+    let bytes = to_bytes(&map).unwrap();
+    let result: HashMap<u32, String> = from_bytes(&bytes).unwrap();
+
+    assert_eq!(result.len(), 3);
+    assert_eq!(result.get(&1).map(String::as_str), Some("one"));
+    assert_eq!(result.get(&2).map(String::as_str), Some("two"));
+    assert_eq!(result.get(&3).map(String::as_str), Some("three"));
 }
