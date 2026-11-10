@@ -115,6 +115,21 @@ where
     deserializer.end().map(move |()| t)
 }
 
+/// Same as `from_bytes_seed`, but decodes one value from the front of `bytes`
+/// and allows trailing bytes. Returns the value and the number of bytes it
+/// used.
+///
+/// Use this to read values that follow each other in a buffer without length
+/// prefixes, where the end of each is known only by decoding it.
+pub fn from_bytes_seed_prefix<'a, T>(seed: T, bytes: &'a [u8]) -> Result<(T::Value, usize)>
+where
+    T: DeserializeSeed<'a>,
+{
+    let mut deserializer = Deserializer::new(bytes, crate::MAX_CONTAINER_DEPTH);
+    let t = seed.deserialize(&mut deserializer)?;
+    Ok((t, bytes.len() - deserializer.input.len()))
+}
+
 /// Deserialization implementation for BCS
 struct Deserializer<'de> {
     input: &'de [u8],
