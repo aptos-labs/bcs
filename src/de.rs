@@ -187,14 +187,14 @@ impl<'de> Deserializer<'de> {
     #[inline]
     fn parse_u16(&mut self) -> Result<u16> {
         let bytes = self.read_bytes(2)?;
-        // SAFETY: We just verified we have exactly 2 bytes
+        // `read_bytes` guarantees exactly 2 bytes.
         Ok(u16::from_le_bytes([bytes[0], bytes[1]]))
     }
 
     #[inline]
     fn parse_u32(&mut self) -> Result<u32> {
         let bytes = self.read_bytes(4)?;
-        // SAFETY: We just verified we have exactly 4 bytes
+        // `read_bytes` guarantees exactly 4 bytes.
         Ok(u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
     }
 
@@ -251,20 +251,20 @@ impl<'de> Deserializer<'de> {
         }
     }
 
-    /// Parse a sequence length, validating against both the maximum allowed length
-    /// and the remaining input size to prevent memory amplification attacks.
+    /// Parse a sequence length, validating against the maximum allowed length.
+    ///
+    /// The length is an element count, not a byte count, so it must not be
+    /// compared against the remaining input: zero-sized elements (e.g.
+    /// `Vec<()>`, a documented BCS encoding) legitimately have a length
+    /// greater than the number of remaining bytes. Element counts are
+    /// bounded by `MAX_SEQUENCE_LENGTH`, and serde caps the capacity it
+    /// pre-allocates from `size_hint`, so a large claimed length cannot
+    /// force a proportional allocation before the input is consumed.
     #[inline]
     fn parse_length(&mut self) -> Result<usize> {
         let len = self.parse_u32_from_uleb128()? as usize;
         if len > crate::MAX_SEQUENCE_LENGTH {
             return Err(Error::ExceededMaxLen(len));
-        }
-        // Security: Validate that the claimed length is plausible given remaining input.
-        // This prevents memory amplification attacks where a small payload claims a huge
-        // length, causing pre-allocation of gigabytes of memory before we detect EOF.
-        // Note: For sequences of multi-byte elements, this is a lower bound check only.
-        if len > self.input.len() {
-            return Err(Error::Eof);
         }
         Ok(len)
     }
@@ -272,7 +272,13 @@ impl<'de> Deserializer<'de> {
     #[inline]
     fn parse_bytes(&mut self) -> Result<&'de [u8]> {
         let len = self.parse_length()?;
-        // Use read_bytes for consistent and efficient slice access
+        // Here `len` is a byte count, so validate it against the remaining
+        // input before handing out the slice. This rejects byte sequences
+        // and strings whose claimed length exceeds the available data
+        // without allocating.
+        if len > self.input.len() {
+            return Err(Error::Eof);
+        }
         self.read_bytes(len)
     }
 

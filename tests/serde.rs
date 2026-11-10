@@ -514,7 +514,7 @@ fn path_buf() {
     let path = Path::new("foo").to_path_buf();
     let encoded = to_bytes(&path).unwrap();
     let decoded: PathBuf = from_bytes(&encoded).unwrap();
-    assert!(path.to_str() == decoded.to_str());
+    assert_eq!(path.to_str(), decoded.to_str());
 }
 
 #[derive(Arbitrary, Debug, Deserialize, Serialize, PartialEq)]
@@ -815,9 +815,9 @@ fn test_eof_error_in_read_bytes() {
 fn test_test_helpers() {
     use bcs::test_helpers::assert_canonical_encode_decode;
 
-    assert_canonical_encode_decode(&42u32);
-    assert_canonical_encode_decode(&"hello".to_string());
-    assert_canonical_encode_decode(&vec![1, 2, 3]);
+    assert_canonical_encode_decode(42u32);
+    assert_canonical_encode_decode("hello".to_string());
+    assert_canonical_encode_decode(vec![1, 2, 3]);
 }
 
 #[test]
@@ -876,26 +876,44 @@ fn test_exceeded_max_sequence_length() {
 
 #[test]
 fn test_memory_amplification_protection() {
-    // Security test: Ensure that claiming a large length with insufficient data
-    // returns Eof quickly without attempting to allocate large amounts of memory.
-    //
-    // A 5-byte payload claiming 1 million elements should fail immediately,
-    // not after trying to allocate memory for 1 million elements.
-
-    // ULEB128 encoding of 1,000,000 = 0xF4240
-    // 0x40 | 0x80 = 0xC0, 0x84 | 0x80 = 0x84 (wait, let me recalculate)
-    // 1,000,000 = 0xF4240
-    // Byte 0: 0x40 | 0x80 = 0xC0 (bits 0-6 = 64)
-    // Byte 1: 0x48 | 0x80 = 0xC8 (bits 7-13 = 72) -- wait let me do this properly
-    // 1,000,000 in binary: 11110100001001000000
-    // Split into 7-bit groups from LSB: 1000000 (64), 0100100 (36), 0111101 (61)
-    // So: 0xC0 (64 + 0x80), 0xA4 (36 + 0x80), 0x3D (61, no continuation)
-    let bytes = vec![0xC0, 0x84, 0x3D]; // ULEB128 for 1,000,000
+    // A payload claiming 1,000,000 elements with no element data must fail
+    // with Eof. The claimed count is bounded by MAX_SEQUENCE_LENGTH and
+    // serde caps pre-allocation from size_hint, so this cannot force a
+    // proportional allocation first.
+    // ULEB128 for 1,000,000: 7-bit groups (64, 4, 61) -> [0xC0, 0x84, 0x3D].
+    let bytes = vec![0xC0, 0x84, 0x3D];
 
     let err = from_bytes::<Vec<u8>>(&bytes).unwrap_err();
-    // Should fail with Eof because we only have 0 bytes of actual data,
-    // but claimed 1,000,000 bytes
     assert!(matches!(err, Error::Eof));
+}
+
+#[test]
+fn test_zero_sized_element_sequences() {
+    // Regression test: a sequence length is an element count, not a byte
+    // count. Zero-sized elements encode as a length prefix alone (see the
+    // `Vec<()>` example in the crate docs), so a length larger than the
+    // remaining byte count is valid and must round-trip.
+    let units: Vec<()> = vec![(); 9_487];
+    let bytes = to_bytes(&units).unwrap();
+    assert_eq!(bytes, vec![0x8f, 0x4a]);
+    let decoded: Vec<()> = from_bytes(&bytes).unwrap();
+    assert_eq!(decoded.len(), 9_487);
+
+    #[derive(Serialize, Deserialize, Debug, PartialEq)]
+    struct UnitStruct;
+
+    let structs = vec![UnitStruct, UnitStruct, UnitStruct];
+    let decoded: Vec<UnitStruct> = from_bytes(&to_bytes(&structs).unwrap()).unwrap();
+    assert_eq!(decoded, structs);
+
+    let nested: Vec<Vec<()>> = vec![vec![(); 5], vec![(); 3]];
+    let decoded: Vec<Vec<()>> = from_bytes(&to_bytes(&nested).unwrap()).unwrap();
+    assert_eq!(decoded, nested);
+
+    let mut map = BTreeMap::new();
+    map.insert((), ());
+    let decoded: BTreeMap<(), ()> = from_bytes(&to_bytes(&map).unwrap()).unwrap();
+    assert_eq!(decoded, map);
 }
 
 #[test]

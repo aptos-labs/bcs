@@ -211,9 +211,7 @@ where
 /// This always returns `false` as BCS is a binary format.
 #[must_use]
 pub fn is_human_readable() -> bool {
-    let mut output = Vec::new();
-    let serializer = Serializer::new(&mut output, crate::MAX_CONTAINER_DEPTH);
-    ser::Serializer::is_human_readable(&serializer)
+    false
 }
 
 /// Serialization implementation for BCS

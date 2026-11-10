@@ -11,11 +11,14 @@
 /// - Serialization fails
 /// - Deserialization fails
 /// - The deserialized value is not equal to the original
-pub fn assert_canonical_encode_decode<T>(t: &T)
+// By value on purpose: this is the established public signature of this
+// helper, and the value is compared against its round-trip result below.
+#[allow(clippy::needless_pass_by_value)]
+pub fn assert_canonical_encode_decode<T>(t: T)
 where
     T: serde::Serialize + serde::de::DeserializeOwned + std::fmt::Debug + PartialEq,
 {
-    let bytes = crate::to_bytes(t).unwrap();
+    let bytes = crate::to_bytes(&t).unwrap();
     let s: T = crate::from_bytes(&bytes).unwrap();
-    assert_eq!(*t, s);
+    assert_eq!(t, s);
 }

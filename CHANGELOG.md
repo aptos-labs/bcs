@@ -4,7 +4,7 @@
 
 ### Security
 
-- **Memory amplification protection**: Deserialization now validates that claimed sequence/string lengths are plausible given the remaining input, preventing DoS attacks where a small malicious payload could trigger large memory allocations.
+- **Memory amplification protection**: Deserialization now validates that claimed byte-sequence/string lengths (byte counts) are plausible given the remaining input, preventing DoS attacks where a small malicious payload could trigger large memory allocations. Element counts for sequences/maps are not byte counts (zero-sized elements encode as a length prefix alone) and remain bounded by `MAX_SEQUENCE_LENGTH` plus serde's capped `size_hint` pre-allocation.
 - **Duplicate map key detection**: Serialization now returns `Error::NonCanonicalMap` when duplicate keys are encountered instead of silently dropping duplicates, ensuring data integrity.
 
 ### Added
@@ -43,6 +43,6 @@
 ## [v0.1.0] - 2020-11-17
 - Initial release.
 
-[Unreleased]: https://github.com/diem/bcs/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/aptos-labs/bcs/compare/v0.1.1...HEAD
 [v0.1.1]: https://github.com/diem/bcs/releases/tag/v0.1.1
 [v0.1.0]: https://github.com/diem/bcs/releases/tag/v0.1.0
