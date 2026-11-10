@@ -83,6 +83,21 @@ where
     deserializer.end().map(move |_| t)
 }
 
+/// Same as `from_bytes_seed`, but decodes one value from the front of `bytes`
+/// and allows trailing bytes. Returns the value and the number of bytes it
+/// used.
+///
+/// Use this to read values that follow each other in a buffer without length
+/// prefixes, where the end of each is known only by decoding it.
+pub fn from_bytes_seed_prefix<'a, T>(seed: T, bytes: &'a [u8]) -> Result<(T::Value, usize)>
+where
+    T: DeserializeSeed<'a>,
+{
+    let mut deserializer = Deserializer::new(bytes, crate::MAX_CONTAINER_DEPTH);
+    let t = seed.deserialize(&mut deserializer)?;
+    Ok((t, bytes.len() - deserializer.input.len()))
+}
+
 /// Deserialization implementation for BCS
 struct Deserializer<'de> {
     input: &'de [u8],
@@ -167,7 +182,7 @@ impl<'de> Deserializer<'de> {
         Ok(u128::from_le_bytes(le_bytes))
     }
 
-    #[allow(clippy::integer_arithmetic)]
+    #[allow(clippy::arithmetic_side_effects)]
     fn parse_u32_from_uleb128(&mut self) -> Result<u32> {
         let mut value: u64 = 0;
         for shift in (0..32).step_by(7) {
@@ -223,7 +238,7 @@ impl<'de> Deserializer<'de> {
     }
 }
 
-impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
+impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
     type Error = Error;
 
     // BCS is not a self-describing format so we can't implement `deserialize_any`
@@ -577,7 +592,7 @@ impl<'de, 'a> de::MapAccess<'de> for MapDeserializer<'a, 'de> {
     }
 }
 
-impl<'de, 'a> de::EnumAccess<'de> for &'a mut Deserializer<'de> {
+impl<'de> de::EnumAccess<'de> for &mut Deserializer<'de> {
     type Error = Error;
     type Variant = Self;
 
@@ -591,7 +606,7 @@ impl<'de, 'a> de::EnumAccess<'de> for &'a mut Deserializer<'de> {
     }
 }
 
-impl<'de, 'a> de::VariantAccess<'de> for &'a mut Deserializer<'de> {
+impl<'de> de::VariantAccess<'de> for &mut Deserializer<'de> {
     type Error = Error;
 
     fn unit_variant(self) -> Result<()> {

@@ -3,10 +3,15 @@
 
 // For some reason deriving `Arbitrary` results in clippy firing a `unit_arg` violation
 #![allow(clippy::unit_arg)]
+// The `Cow` tests intentionally exercise owned `Cow` types, and the
+// `Arbitrary` derive from proptest-derive generates non-local `impl`s.
+#![allow(clippy::owned_cow)]
+#![allow(non_local_definitions)]
 
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt,
+    marker::PhantomData,
 };
 
 use proptest::prelude::*;
@@ -14,8 +19,8 @@ use proptest_derive::Arbitrary;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use bcs::{
-    from_bytes, from_bytes_with_limit, serialized_size, to_bytes, to_bytes_with_limit, Error,
-    MAX_CONTAINER_DEPTH, MAX_SEQUENCE_LENGTH,
+    from_bytes, from_bytes_seed_prefix, from_bytes_with_limit, serialized_size, to_bytes,
+    to_bytes_with_limit, Error, MAX_CONTAINER_DEPTH, MAX_SEQUENCE_LENGTH,
 };
 
 fn is_same<T>(t: T)
@@ -402,6 +407,25 @@ fn leftover_bytes() {
 }
 
 #[test]
+fn prefix_allows_leftover_bytes() {
+    // Two vectors back to back, with no length prefix around either.
+    let seq = vec![3, 1, 2, 3, 2, 4, 5];
+    let (value, used) = from_bytes_seed_prefix(PhantomData::<Vec<u8>>, &seq).unwrap();
+    assert_eq!(value, vec![1, 2, 3]);
+    assert_eq!(used, 4);
+
+    let (value, used) = from_bytes_seed_prefix(PhantomData::<Vec<u8>>, &seq[used..]).unwrap();
+    assert_eq!(value, vec![4, 5]);
+    assert_eq!(used, 3);
+
+    // A truncated value is still an error.
+    assert_eq!(
+        from_bytes_seed_prefix(PhantomData::<Vec<u8>>, &seq[..2]),
+        Err(Error::Eof)
+    );
+}
+
+#[test]
 fn test_f32() {
     assert!(to_bytes(&1.0f32).is_err());
 }
@@ -545,7 +569,7 @@ fn serde_known_vector() {
     map.insert(vec![20, 21, 89, 105], vec![201, 23, 90]);
 
     let f = Foo {
-        a: u64::max_value(),
+        a: u64::MAX,
         b: vec![100, 99, 88, 77, 66, 55],
         c: b,
         d: true,

@@ -12,7 +12,7 @@
 //! * provide good performance and concise (binary) representations;
 //! * support a rich set of data types commonly used in Rust;
 //! * enforce canonical serialization, meaning that every value of a given type should have
-//! a single valid representation.
+//!   a single valid representation.
 //!
 //! BCS also aims to mitigate the consequence of malicious inputs by enforcing well-defined limits
 //! on large or nested containers during (de)serialization.
@@ -44,7 +44,7 @@
 //! applications must carefully plan in advance for adhoc extension points:
 //! * Enums may be used for explicit versioning and backward compatibility (e.g. extensible query interfaces).
 //! * In some cases, data fields of type `Vec<u8>` may also be added to allow (future) unknown payloads
-//! in serialized form.
+//!   in serialized form.
 //!
 //! ## Detailed Specifications
 //!
@@ -314,7 +314,10 @@ pub const MAX_SEQUENCE_LENGTH: usize = (1 << 31) - 1;
 /// Maximal allowed depth of BCS data, counting only structs and enums.
 pub const MAX_CONTAINER_DEPTH: usize = 500;
 
-pub use de::{from_bytes, from_bytes_seed, from_bytes_seed_with_limit, from_bytes_with_limit};
+pub use de::{
+    from_bytes, from_bytes_seed, from_bytes_seed_prefix, from_bytes_seed_with_limit,
+    from_bytes_with_limit,
+};
 pub use error::{Error, Result};
 pub use ser::{
     is_human_readable, serialize_into, serialize_into_with_limit, serialized_size,
