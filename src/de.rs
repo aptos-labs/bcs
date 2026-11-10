@@ -182,7 +182,7 @@ impl<'de> Deserializer<'de> {
         Ok(u128::from_le_bytes(le_bytes))
     }
 
-    #[allow(clippy::integer_arithmetic)]
+    #[allow(clippy::arithmetic_side_effects)]
     fn parse_u32_from_uleb128(&mut self) -> Result<u32> {
         let mut value: u64 = 0;
         for shift in (0..32).step_by(7) {
@@ -238,7 +238,7 @@ impl<'de> Deserializer<'de> {
     }
 }
 
-impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
+impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
     type Error = Error;
 
     // BCS is not a self-describing format so we can't implement `deserialize_any`
@@ -592,7 +592,7 @@ impl<'de, 'a> de::MapAccess<'de> for MapDeserializer<'a, 'de> {
     }
 }
 
-impl<'de, 'a> de::EnumAccess<'de> for &'a mut Deserializer<'de> {
+impl<'de> de::EnumAccess<'de> for &mut Deserializer<'de> {
     type Error = Error;
     type Variant = Self;
 
@@ -606,7 +606,7 @@ impl<'de, 'a> de::EnumAccess<'de> for &'a mut Deserializer<'de> {
     }
 }
 
-impl<'de, 'a> de::VariantAccess<'de> for &'a mut Deserializer<'de> {
+impl<'de> de::VariantAccess<'de> for &mut Deserializer<'de> {
     type Error = Error;
 
     fn unit_variant(self) -> Result<()> {

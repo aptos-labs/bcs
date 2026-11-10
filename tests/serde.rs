@@ -3,6 +3,10 @@
 
 // For some reason deriving `Arbitrary` results in clippy firing a `unit_arg` violation
 #![allow(clippy::unit_arg)]
+// The `Cow` tests intentionally exercise owned `Cow` types, and the
+// `Arbitrary` derive from proptest-derive generates non-local `impl`s.
+#![allow(clippy::owned_cow)]
+#![allow(non_local_definitions)]
 
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -565,7 +569,7 @@ fn serde_known_vector() {
     map.insert(vec![20, 21, 89, 105], vec![201, 23, 90]);
 
     let f = Foo {
-        a: u64::max_value(),
+        a: u64::MAX,
         b: vec![100, 99, 88, 77, 66, 55],
         c: b,
         d: true,
