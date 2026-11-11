@@ -546,7 +546,13 @@ where
             return Err(Error::ExpectedMapValue);
         }
         self.entries.sort_by(|e1, e2| e1.0.cmp(&e2.0));
-        self.entries.dedup_by(|e1, e2| e1.0.eq(&e2.0));
+        // BCS maps must have unique keys. Silently dropping a duplicate
+        // entry (the previous behaviour) loses data without any signal, so
+        // reject the map instead. Serializers for std maps never emit
+        // duplicate keys; only hand-written `Serialize` impls can hit this.
+        if self.entries.windows(2).any(|w| w[0].0 == w[1].0) {
+            return Err(Error::NonCanonicalMap);
+        }
 
         let len = self.entries.len();
         self.serializer.output_seq_len(len)?;

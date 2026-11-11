@@ -14,9 +14,9 @@ thiserror = "1.0.22"
 serde = { version = "1.0.117", features = ["derive"] }
 
 [dev-dependencies]
-criterion = "0.3.3"
-proptest = "0.10.1"
-proptest-derive = "0.2.0"
+criterion = "0.5"
+proptest = "1"
+proptest-derive = "0.5"
 
 [[bench]]
 name = "bcs_bench"
