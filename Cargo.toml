@@ -21,3 +21,14 @@ proptest-derive = "0.2.0"
 [[bench]]
 name = "bcs_bench"
 harness = false
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+# These casts are intentional for binary serialization
+cast_possible_truncation = "allow"
+cast_possible_wrap = "allow"
+cast_sign_loss = "allow"

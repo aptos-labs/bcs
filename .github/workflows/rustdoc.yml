@@ -1,31 +1,41 @@
-name: rustdoc
+name: Deploy Documentation
 
 on:
   push:
-    branches: [ master ]
+    branches: [main, master]
 
 env:
   CARGO_INCREMENTAL: 0
-  RUSTFLAGS: -D warnings
 
 jobs:
-  rustdoc:
+  deploy-docs:
+    name: Deploy Documentation
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Install Rust toolchain
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
         with:
-          toolchain: stable
-          override: true
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-doc-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Build Documentation
+      - name: Build documentation
         run: cargo doc --no-deps
+        env:
+          RUSTDOCFLAGS: -D warnings
 
-      - name: Deploy Docs
+      - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
