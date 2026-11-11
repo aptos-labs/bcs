@@ -3,6 +3,10 @@
 
 // For some reason deriving `Arbitrary` results in clippy firing a `unit_arg` violation
 #![allow(clippy::unit_arg)]
+// The Cow tests below intentionally deserialize into Cow<String>/Cow<Vec<_>>
+// to cover those impls; clippy's suggested Cow<str>/Cow<[T]> would test
+// different types.
+#![allow(clippy::owned_cow)]
 #![allow(non_local_definitions)]
 
 use std::{
