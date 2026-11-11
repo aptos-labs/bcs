@@ -121,6 +121,11 @@ where
 ///
 /// Use this to read values that follow each other in a buffer without length
 /// prefixes, where the end of each is known only by decoding it.
+///
+/// # Errors
+///
+/// Returns an error if any error condition from [`from_bytes_seed`] occurs,
+/// except that trailing bytes after the decoded value are not an error.
 pub fn from_bytes_seed_prefix<'a, T>(seed: T, bytes: &'a [u8]) -> Result<(T::Value, usize)>
 where
     T: DeserializeSeed<'a>,
