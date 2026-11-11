@@ -14,6 +14,7 @@
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt,
+    marker::PhantomData,
 };
 
 use proptest::prelude::*;
@@ -21,8 +22,8 @@ use proptest_derive::Arbitrary;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use bcs::{
-    from_bytes, from_bytes_with_limit, serialized_size, to_bytes, to_bytes_with_limit, Error,
-    MAX_CONTAINER_DEPTH, MAX_SEQUENCE_LENGTH,
+    from_bytes, from_bytes_seed_prefix, from_bytes_with_limit, serialized_size, to_bytes,
+    to_bytes_with_limit, Error, MAX_CONTAINER_DEPTH, MAX_SEQUENCE_LENGTH,
 };
 
 fn is_same<T>(t: T)
@@ -406,6 +407,25 @@ fn by_default_btreesets_are_serialized_as_sequences() {
 fn leftover_bytes() {
     let seq = vec![5, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]; // 5 extra elements
     assert_eq!(from_bytes::<Vec<u8>>(&seq), Err(Error::RemainingInput));
+}
+
+#[test]
+fn prefix_allows_leftover_bytes() {
+    // Two vectors back to back, with no length prefix around either.
+    let seq = vec![3, 1, 2, 3, 2, 4, 5];
+    let (value, used) = from_bytes_seed_prefix(PhantomData::<Vec<u8>>, &seq).unwrap();
+    assert_eq!(value, vec![1, 2, 3]);
+    assert_eq!(used, 4);
+
+    let (value, used) = from_bytes_seed_prefix(PhantomData::<Vec<u8>>, &seq[used..]).unwrap();
+    assert_eq!(value, vec![4, 5]);
+    assert_eq!(used, 3);
+
+    // A truncated value is still an error.
+    assert_eq!(
+        from_bytes_seed_prefix(PhantomData::<Vec<u8>>, &seq[..2]),
+        Err(Error::Eof)
+    );
 }
 
 #[test]
