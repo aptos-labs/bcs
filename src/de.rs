@@ -593,12 +593,15 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
         r
     }
 
-    // BCS does not utilize identifiers, so throw them away
-    fn deserialize_identifier<V>(self, visitor: V) -> Result<V::Value>
+    // BCS does not utilize identifiers: field and variant names are never
+    // present on the wire (variants are ULEB128 indices, struct fields are
+    // positional). Refuse rather than reinterpret a length-prefixed byte
+    // string as an identifier, which could silently consume payload bytes.
+    fn deserialize_identifier<V>(self, _visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
-        self.deserialize_bytes(visitor)
+        Err(Error::NotSupported("deserialize_identifier"))
     }
 
     // BCS is not a self-describing format so we can't implement `deserialize_ignored_any`
@@ -646,7 +649,16 @@ impl<'de> de::SeqAccess<'de> for SeqDeserializer<'_, 'de> {
 
     #[inline]
     fn size_hint(&self) -> Option<usize> {
-        Some(self.remaining)
+        // `remaining` is decoded from untrusted input and can be as large as
+        // MAX_SEQUENCE_LENGTH even when no payload bytes follow. Visitors may
+        // use this hint to pre-allocate, so never advertise more elements than
+        // there are bytes left. This bounds any hint-driven allocation by
+        // the size of the input already supplied, while the hint stays exact
+        // for inputs whose elements occupy at least one byte each. Elements are
+        // still produced by repeated `next_element_seed` calls, so capping
+        // the hint cannot change what a well-behaved visitor deserializes
+        // (e.g. long sequences of zero-byte elements remain decodable).
+        Some(self.remaining.min(self.de.input.len()))
     }
 }
 
@@ -706,7 +718,10 @@ impl<'de> de::MapAccess<'de> for MapDeserializer<'_, 'de> {
 
     #[inline]
     fn size_hint(&self) -> Option<usize> {
-        Some(self.remaining)
+        // See SeqDeserializer::size_hint: the entry count comes from
+        // untrusted input, so bound the pre-allocation hint by the number
+        // of input bytes that remain.
+        Some(self.remaining.min(self.de.input.len()))
     }
 }
 

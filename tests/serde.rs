@@ -3,13 +3,16 @@
 
 // For some reason deriving `Arbitrary` results in clippy firing a `unit_arg` violation
 #![allow(clippy::unit_arg)]
+// The Cow tests below intentionally deserialize into Cow<String>/Cow<Vec<_>>
+// to cover those impls; clippy's suggested Cow<str>/Cow<[T]> would test
+// different types.
+#![allow(clippy::owned_cow)]
 #![allow(non_local_definitions)]
 // Allow these clippy warnings for test code
 #![allow(clippy::needless_pass_by_value)]
 #![allow(clippy::zero_sized_map_values)]
 #![allow(clippy::items_after_statements)]
 #![allow(clippy::match_wildcard_for_single_variants)]
-#![allow(clippy::owned_cow)]
 
 use std::{
     collections::{BTreeMap, BTreeSet},
