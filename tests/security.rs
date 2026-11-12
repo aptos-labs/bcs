@@ -11,6 +11,8 @@
 //! silently drop data.
 
 #![allow(non_local_definitions)]
+// Mirrors the allowance in tests/serde.rs: roundtrip helpers take values.
+#![allow(clippy::needless_pass_by_value)]
 
 use std::{
     collections::{BTreeMap, HashMap},
@@ -279,7 +281,7 @@ fn uleb128_length_boundaries_roundtrip() {
     ];
     for (len, prefix) in cases {
         let bytes = to_bytes(&vec![(); *len]).unwrap();
-        assert_eq!(&bytes, prefix, "encoding of length {}", len);
+        assert_eq!(&bytes, prefix, "encoding of length {len}");
         assert_eq!(from_bytes::<Vec<()>>(&bytes).unwrap().len(), *len);
     }
 }
@@ -295,8 +297,7 @@ fn uleb128_noncanonical_and_overflowing_lengths_are_rejected() {
         assert_eq!(
             from_bytes::<Vec<u8>>(bytes),
             Err(Error::NonCanonicalUleb128Encoding),
-            "input {:02x?}",
-            bytes
+            "input {bytes:02x?}"
         );
     }
     // Longer than a u32 ULEB128 can ever be, and values overflowing u32.
@@ -308,8 +309,7 @@ fn uleb128_noncanonical_and_overflowing_lengths_are_rejected() {
         assert_eq!(
             from_bytes::<Vec<u8>>(bytes),
             Err(Error::IntegerOverflowDuringUleb128Decoding),
-            "input {:02x?}",
-            bytes
+            "input {bytes:02x?}"
         );
     }
     // u32::MAX decodes fine as an integer but exceeds MAX_SEQUENCE_LENGTH.
@@ -516,7 +516,7 @@ fn serializer_protocol_misuse_is_an_error() {
 // ---------------------------------------------------------------------------
 
 struct AnyVisitor;
-impl<'de> Visitor<'de> for AnyVisitor {
+impl Visitor<'_> for AnyVisitor {
     type Value = ();
     fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "anything")
@@ -588,15 +588,13 @@ fn invalid_scalar_encodings_are_rejected_for_every_bad_byte() {
         assert_eq!(
             from_bytes::<bool>(&[byte]).is_ok(),
             byte <= 1,
-            "bool byte {}",
-            byte
+            "bool byte {byte}"
         );
         let input: &[u8] = if byte == 0 { &[0] } else { &[byte, 42] };
         assert_eq!(
             from_bytes::<Option<u8>>(input).is_ok(),
             byte <= 1,
-            "option byte {}",
-            byte
+            "option byte {byte}"
         );
     }
     // Length prefix claims more string bytes than remain.
